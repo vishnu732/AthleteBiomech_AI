@@ -1,0 +1,43 @@
+﻿# Virtual environment
+venv/
+.venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Model files
+models/*.pkl
+models/*.joblib
+
+# Output files
+outputs/processed_videos/*
+outputs/reports/*
+outputs/screenshots/*
+
+# Keep output folders
+!outputs/processed_videos/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/screenshots/.gitkeep
+
+# Large video files
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Logs
+*.log
