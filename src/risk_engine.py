@@ -1,4 +1,9 @@
-def calculate_workload_risk(
+import pandas as pd
+import joblib
+from pathlib import Path
+
+
+def get_rule_based_result(
     age,
     sport,
     training_days,
@@ -69,7 +74,58 @@ def calculate_workload_risk(
     else:
         factor_scores["Training Intensity"] = 3
 
-    risk_score = sum(factor_scores.values())
+    rule_score = sum(factor_scores.values())
+    rule_score = min(rule_score, 100)
+
+    return rule_score, factor_scores, reasons
+
+
+def calculate_workload_risk(
+    age,
+    sport,
+    training_days,
+    matches_30_days,
+    rest_days,
+    previous_injury,
+    training_intensity
+):
+    rule_score, factor_scores, reasons = get_rule_based_result(
+        age,
+        sport,
+        training_days,
+        matches_30_days,
+        rest_days,
+        previous_injury,
+        training_intensity
+    )
+
+    ROOT_DIR = Path(__file__).resolve().parents[1]
+    MODEL_PATH = ROOT_DIR / "models" / "injury_risk_model.pkl"
+
+    model_used = "Rule-Based Engine"
+    ml_score = rule_score
+
+    if MODEL_PATH.exists():
+        model = joblib.load(MODEL_PATH)
+
+        input_data = pd.DataFrame([{
+            "age": age,
+            "sport": sport,
+            "training_days": training_days,
+            "matches_30_days": matches_30_days,
+            "rest_days": rest_days,
+            "previous_injury": previous_injury,
+            "training_intensity": training_intensity
+        }])
+
+        ml_score = model.predict(input_data)[0]
+        ml_score = int(round(max(0, min(100, ml_score))))
+
+        risk_score = int(round((0.7 * ml_score) + (0.3 * rule_score)))
+        model_used = "Random Forest ML Model"
+    else:
+        risk_score = rule_score
+
     risk_score = min(risk_score, 100)
 
     if risk_score <= 30:
@@ -103,5 +159,8 @@ def calculate_workload_risk(
         "reasons": reasons,
         "risky_areas": risky_areas,
         "factor_scores": factor_scores,
-        "body_area_risks": body_area_risks
+        "body_area_risks": body_area_risks,
+        "model_used": model_used,
+        "ml_score": ml_score,
+        "rule_score": rule_score
     }

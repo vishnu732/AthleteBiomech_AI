@@ -104,6 +104,8 @@ if st.button("Predict Injury Risk"):
 
     with metric_col3:
         st.metric("Sport", sport)
+        st.caption(f"Prediction Mode: {result['model_used']}")
+        st.caption(f"ML Score: {result['ml_score']}% | Rule Score: {result['rule_score']}%")
 
     st.markdown("### Overall Risk Meter")
     st.progress(risk_score / 100)
