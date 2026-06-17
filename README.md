@@ -1,4 +1,3 @@
-cat > README.md <<'EOF'
 # AthleteBiomech AI
 
 **AthleteBiomech AI** is an AI-powered multi-sport injury risk analysis platform that combines athlete workload data with video-based biomechanical movement analysis. The system is designed to estimate injury risk, identify overloaded body areas, and generate coach-style recommendations for athletes across multiple sports.
@@ -290,5 +289,3 @@ Completed:
 Next planned module:
 
 **ML-based injury risk prediction using synthetic athlete workload data.**
-
-EOF
