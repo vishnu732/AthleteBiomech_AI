@@ -88,6 +88,9 @@ if st.button("Predict Injury Risk"):
         previous_injury=previous_injury,
         training_intensity=training_intensity
     )
+    st.session_state["workload_result"] = result
+    st.session_state["athlete_name"] = athlete_name
+    st.session_state["selected_sport"] = sport
 
     risk_score = result["risk_score"]
     risk_level = result["risk_level"]

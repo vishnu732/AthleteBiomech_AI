@@ -190,6 +190,9 @@ if uploaded_video is not None:
 
             else:
                 st.success("Target player pose analysis completed successfully.")
+                st.session_state["pose_result"] = pose_result
+                st.session_state["video_sport"] = sport
+                st.session_state["movement_type"] = movement_type
 
                 metric_col1, metric_col2, metric_col3 = st.columns(3)
 
