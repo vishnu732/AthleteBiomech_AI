@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import sys
 from pathlib import Path
 
@@ -12,6 +13,9 @@ from src.video_processor import (
     extract_sample_frames
 )
 
+from src.pose_analyzer import analyze_video_pose
+
+
 st.set_page_config(
     page_title="Video Biomechanics Analyzer",
     page_icon="🎥",
@@ -19,12 +23,16 @@ st.set_page_config(
 )
 
 st.title("🎥 Video Biomechanics Analyzer")
+
 st.write(
     """
-    Upload a sports movement video to extract metadata and sample frames.
-    This module is the foundation for pose estimation, joint-angle tracking,
-    and body-load analysis.
+    Upload a sports movement video to extract video metadata, sample frames,
+    pose skeleton overlays, joint angles, and early movement-risk indicators.
     """
+)
+
+st.warning(
+    "Prototype note: This is an AI movement-analysis demo and not a medical diagnosis tool."
 )
 
 st.markdown("---")
@@ -89,8 +97,11 @@ if uploaded_video is not None:
         with col5:
             st.metric("Height", metadata["height"])
 
-        st.markdown("---")
+    st.markdown("---")
 
+    tab1, tab2 = st.tabs(["Frame Extraction", "Pose Skeleton Analysis"])
+
+    with tab1:
         st.markdown("### Extract Sample Frames")
 
         if st.button("Extract Frames"):
@@ -112,67 +123,163 @@ if uploaded_video is not None:
                             caption=f"Frame {index + 1}",
                             use_container_width=True
                         )
+            else:
+                st.error("No frames could be extracted from this video.")
+
+    with tab2:
+        st.markdown("### Run Pose Skeleton Analysis")
+
+        st.write(
+            """
+            This uses MediaPipe Pose to detect body landmarks, draw skeleton overlays,
+            calculate joint angles, and flag risky movement patterns.
+            """
+        )
+
+        if st.button("Analyze Pose Skeleton"):
+            pose_result = analyze_video_pose(
+                video_path=video_path,
+                output_dir=screenshot_output_dir,
+                max_frames=6
+            )
+
+            if not pose_result["success"]:
+                st.error(pose_result["error"])
+
+                if "analyzed_frames" in pose_result:
+                    st.markdown("### Frames Checked")
+                    checked_cols = st.columns(3)
+
+                    for index, frame_path in enumerate(pose_result["analyzed_frames"]):
+                        with checked_cols[index % 3]:
+                            st.image(
+                                str(frame_path),
+                                caption=f"Checked Frame {index + 1}",
+                                use_container_width=True
+                            )
+            else:
+                st.success("Pose analysis completed successfully.")
+
+                metric_col1, metric_col2, metric_col3 = st.columns(3)
+
+                with metric_col1:
+                    st.metric(
+                        "Movement Risk Score",
+                        f"{pose_result['movement_risk_score']}%"
+                    )
+
+                with metric_col2:
+                    st.metric(
+                        "Movement Risk Level",
+                        pose_result["movement_risk_level"]
+                    )
+
+                with metric_col3:
+                    st.metric("Sport", sport)
+
+                st.markdown("### Skeleton Overlay Frames")
+
+                pose_cols = st.columns(3)
+
+                for index, frame_path in enumerate(pose_result["analyzed_frames"]):
+                    with pose_cols[index % 3]:
+                        st.image(
+                            str(frame_path),
+                            caption=f"Pose Frame {index + 1}",
+                            use_container_width=True
+                        )
 
                 st.markdown("---")
 
-                st.markdown("### Initial Biomechanics Analysis Status")
+                st.markdown("### Average Joint Angles")
 
-                st.info(
-                    f"""
-                    Sport Selected: {sport}
+                angle_df = pd.DataFrame({
+                    "Joint / Movement Metric": list(pose_result["average_angles"].keys()),
+                    "Average Angle": list(pose_result["average_angles"].values())
+                })
 
-                    Movement Type: {movement_type}
+                st.dataframe(angle_df, use_container_width=True)
 
-                    Current Module Status:
-                    - Video upload: Completed
-                    - Metadata extraction: Completed
-                    - Frame extraction: Completed
-                    - Pose estimation: Coming next
-                    - Joint-angle calculation: Coming next
-                    - Injury risk from movement: Coming next
-                    """
+                st.bar_chart(
+                    angle_df,
+                    x="Joint / Movement Metric",
+                    y="Average Angle"
                 )
 
-                st.markdown("### Next Planned Detection")
+                st.markdown("---")
+
+                st.markdown("### Risky Movement Flags")
+
+                for flag in pose_result["risk_flags"]:
+                    st.write(f"- {flag}")
+
+                st.markdown("### Sport-Specific Interpretation")
 
                 if sport == "Cricket":
-                    st.write("- Bowling shoulder alignment")
-                    st.write("- Elbow angle during release")
-                    st.write("- Spine tilt during delivery")
-                    st.write("- Front knee landing stability")
-                    st.write("- Ankle and foot landing position")
+                    st.info(
+                        """
+                        Cricket focus:
+                        - Shoulder and elbow loading during bowling/throwing
+                        - Spine tilt during delivery
+                        - Front knee stability
+                        - Ankle and landing balance
+                        """
+                    )
 
                 elif sport == "Basketball":
-                    st.write("- Knee valgus during landing")
-                    st.write("- Ankle roll risk")
-                    st.write("- Hip-knee alignment")
-                    st.write("- Jump landing balance")
+                    st.info(
+                        """
+                        Basketball focus:
+                        - Knee valgus during jump landing
+                        - Ankle roll risk
+                        - Hip-knee alignment
+                        - Landing balance
+                        """
+                    )
 
                 elif sport == "Soccer":
-                    st.write("- Hip rotation during kicking")
-                    st.write("- Knee loading")
-                    st.write("- Ankle stability")
-                    st.write("- Sprint posture and hamstring load")
+                    st.info(
+                        """
+                        Soccer focus:
+                        - Hip rotation during kicking
+                        - Knee loading
+                        - Ankle stability
+                        - Sprint posture and hamstring load
+                        """
+                    )
 
                 elif sport == "Tennis":
-                    st.write("- Shoulder load during serve")
-                    st.write("- Elbow and wrist stress")
-                    st.write("- Spine rotation")
-                    st.write("- Knee bend during serve")
+                    st.info(
+                        """
+                        Tennis focus:
+                        - Shoulder load during serve
+                        - Elbow and wrist stress
+                        - Spine rotation
+                        - Knee bend during serve
+                        """
+                    )
 
                 elif sport == "Running":
-                    st.write("- Hip drop")
-                    st.write("- Knee angle")
-                    st.write("- Ankle landing position")
-                    st.write("- Stride imbalance")
+                    st.info(
+                        """
+                        Running focus:
+                        - Hip drop
+                        - Knee angle
+                        - Ankle landing position
+                        - Stride imbalance
+                        """
+                    )
 
                 elif sport == "Weightlifting":
-                    st.write("- Spine/back angle")
-                    st.write("- Knee collapse")
-                    st.write("- Hip alignment")
-                    st.write("- Shoulder stability")
+                    st.info(
+                        """
+                        Weightlifting focus:
+                        - Spine/back angle
+                        - Knee collapse
+                        - Hip alignment
+                        - Shoulder stability
+                        """
+                    )
 
-            else:
-                st.error("No frames could be extracted from this video.")
 else:
     st.info("Upload a video to begin analysis.")
