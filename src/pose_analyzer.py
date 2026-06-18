@@ -1,5 +1,6 @@
 import cv2
 import uuid
+import math
 from pathlib import Path
 
 from ultralytics import YOLO
@@ -7,7 +8,12 @@ from ultralytics import YOLO
 from src.joint_angle_calculator import calculate_angle, calculate_spine_tilt
 
 
-# COCO keypoint indexes used by YOLO pose models
+# YOLO Pose COCO keypoint indexes
+NOSE = 0
+LEFT_EYE = 1
+RIGHT_EYE = 2
+LEFT_EAR = 3
+RIGHT_EAR = 4
 LEFT_SHOULDER = 5
 RIGHT_SHOULDER = 6
 LEFT_ELBOW = 7
@@ -22,10 +28,23 @@ LEFT_ANKLE = 15
 RIGHT_ANKLE = 16
 
 
+SKELETON_CONNECTIONS = [
+    (LEFT_SHOULDER, RIGHT_SHOULDER),
+    (LEFT_SHOULDER, LEFT_ELBOW),
+    (LEFT_ELBOW, LEFT_WRIST),
+    (RIGHT_SHOULDER, RIGHT_ELBOW),
+    (RIGHT_ELBOW, RIGHT_WRIST),
+    (LEFT_SHOULDER, LEFT_HIP),
+    (RIGHT_SHOULDER, RIGHT_HIP),
+    (LEFT_HIP, RIGHT_HIP),
+    (LEFT_HIP, LEFT_KNEE),
+    (LEFT_KNEE, LEFT_ANKLE),
+    (RIGHT_HIP, RIGHT_KNEE),
+    (RIGHT_KNEE, RIGHT_ANKLE)
+]
+
+
 def get_point(keypoints, index):
-    """
-    Returns x, y point from YOLO keypoints.
-    """
     return (
         float(keypoints[index][0]),
         float(keypoints[index][1])
@@ -33,9 +52,6 @@ def get_point(keypoints, index):
 
 
 def calculate_pose_angles_from_yolo(keypoints):
-    """
-    Calculates major joint angles from YOLO pose keypoints.
-    """
     left_shoulder = get_point(keypoints, LEFT_SHOULDER)
     right_shoulder = get_point(keypoints, RIGHT_SHOULDER)
 
@@ -54,7 +70,7 @@ def calculate_pose_angles_from_yolo(keypoints):
     left_ankle = get_point(keypoints, LEFT_ANKLE)
     right_ankle = get_point(keypoints, RIGHT_ANKLE)
 
-    angles = {
+    return {
         "left_elbow_angle": calculate_angle(left_shoulder, left_elbow, left_wrist),
         "right_elbow_angle": calculate_angle(right_shoulder, right_elbow, right_wrist),
         "left_knee_angle": calculate_angle(left_hip, left_knee, left_ankle),
@@ -69,13 +85,104 @@ def calculate_pose_angles_from_yolo(keypoints):
         )
     }
 
-    return angles
+
+def select_target_player(boxes, frame_width, frame_height, target_mode):
+    """
+    Selects one target player from multiple detected people.
+    """
+    if boxes is None or len(boxes) == 0:
+        return None
+
+    best_index = 0
+
+    if target_mode == "Largest Player":
+        max_area = -1
+
+        for i, box in enumerate(boxes):
+            x1, y1, x2, y2 = box
+            area = max(0, x2 - x1) * max(0, y2 - y1)
+
+            if area > max_area:
+                max_area = area
+                best_index = i
+
+    elif target_mode == "Center Player":
+        frame_center_x = frame_width / 2
+        frame_center_y = frame_height / 2
+        min_distance = float("inf")
+
+        for i, box in enumerate(boxes):
+            x1, y1, x2, y2 = box
+            player_center_x = (x1 + x2) / 2
+            player_center_y = (y1 + y2) / 2
+
+            distance = math.sqrt(
+                (player_center_x - frame_center_x) ** 2
+                + (player_center_y - frame_center_y) ** 2
+            )
+
+            if distance < min_distance:
+                min_distance = distance
+                best_index = i
+
+    return best_index
+
+
+def draw_target_skeleton(frame, keypoints, box):
+    """
+    Draws skeleton only for the selected target player.
+    """
+    annotated = frame.copy()
+
+    x1, y1, x2, y2 = [int(v) for v in box]
+
+    cv2.rectangle(
+        annotated,
+        (x1, y1),
+        (x2, y2),
+        (0, 255, 0),
+        3
+    )
+
+    cv2.putText(
+        annotated,
+        "TARGET PLAYER",
+        (x1, max(y1 - 10, 30)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 0),
+        2
+    )
+
+    for start_idx, end_idx in SKELETON_CONNECTIONS:
+        x_start, y_start = keypoints[start_idx]
+        x_end, y_end = keypoints[end_idx]
+
+        if x_start > 0 and y_start > 0 and x_end > 0 and y_end > 0:
+            cv2.line(
+                annotated,
+                (int(x_start), int(y_start)),
+                (int(x_end), int(y_end)),
+                (255, 255, 0),
+                3
+            )
+
+    for point in keypoints:
+        x, y = point
+
+        if x > 0 and y > 0:
+            cv2.circle(
+                annotated,
+                (int(x), int(y)),
+                5,
+                (0, 0, 255),
+                -1
+            )
+
+    return annotated
 
 
 def generate_pose_risk_flags(average_angles):
-    """
-    Simple prototype risk rules based on average joint angles.
-    """
     flags = []
 
     left_knee = average_angles.get("left_knee_angle", 0)
@@ -117,10 +224,15 @@ def generate_pose_risk_flags(average_angles):
     return movement_risk_score, movement_risk_level, flags
 
 
-def analyze_video_pose(video_path, output_dir, max_frames=6):
+def analyze_video_pose(
+    video_path,
+    output_dir,
+    target_mode="Largest Player",
+    analysis_fps=2,
+    max_analysis_seconds=10
+):
     """
-    Runs YOLOv8 pose detection on sampled video frames.
-    Saves skeleton-overlay frames and returns joint-angle summary.
+    Runs YOLOv8 pose detection on one targeted player only.
     """
     video_path = str(video_path)
     output_dir = Path(output_dir)
@@ -136,104 +248,123 @@ def analyze_video_pose(video_path, output_dir, max_frames=6):
             "error": "Unable to open video for pose analysis."
         }
 
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    if frame_count == 0:
+    if frame_count == 0 or video_fps == 0:
         cap.release()
         return {
             "success": False,
-            "error": "Video has no frames."
+            "error": "Video has no readable frames."
         }
 
-    interval = max(frame_count // max_frames, 1)
+    total_duration = frame_count / video_fps
+    analysis_duration = min(total_duration, max_analysis_seconds)
+
+    frame_interval = max(int(video_fps / analysis_fps), 1)
+    max_frames_to_process = int(analysis_duration * analysis_fps)
 
     analyzed_frames = []
     all_angles = []
 
     frame_index = 0
-    saved_count = 0
+    processed_count = 0
+    target_detected_count = 0
 
-    while cap.isOpened() and saved_count < max_frames:
+    while cap.isOpened() and processed_count < max_frames_to_process:
         ret, frame = cap.read()
 
         if not ret:
             break
 
-        if frame_index % interval == 0:
+        if frame_index % frame_interval == 0:
             results = model.predict(frame, conf=0.3, verbose=False)
+
+            annotated_frame = frame.copy()
 
             if results and len(results) > 0:
                 result = results[0]
-                annotated_frame = result.plot()
 
-                if result.keypoints is not None and result.keypoints.xy is not None:
+                if (
+                    result.keypoints is not None
+                    and result.keypoints.xy is not None
+                    and result.boxes is not None
+                ):
                     keypoints_data = result.keypoints.xy.cpu().numpy()
+                    boxes_data = result.boxes.xyxy.cpu().numpy()
 
-                    if len(keypoints_data) > 0:
-                        person_keypoints = keypoints_data[0]
+                    if len(keypoints_data) > 0 and len(boxes_data) > 0:
+                        target_index = select_target_player(
+                            boxes=boxes_data,
+                            frame_width=frame_width,
+                            frame_height=frame_height,
+                            target_mode=target_mode
+                        )
 
-                        try:
-                            angles = calculate_pose_angles_from_yolo(person_keypoints)
-                            all_angles.append(angles)
+                        if target_index is not None:
+                            target_keypoints = keypoints_data[target_index]
+                            target_box = boxes_data[target_index]
 
-                            cv2.putText(
-                                annotated_frame,
-                                "YOLO Pose Detected",
-                                (30, 40),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                1,
-                                (0, 255, 0),
-                                2
+                            annotated_frame = draw_target_skeleton(
+                                frame=frame,
+                                keypoints=target_keypoints,
+                                box=target_box
                             )
-                        except Exception:
-                            cv2.putText(
-                                annotated_frame,
-                                "Pose Detected - Angle Error",
-                                (30, 40),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                1,
-                                (0, 255, 255),
-                                2
-                            )
+
+                            try:
+                                angles = calculate_pose_angles_from_yolo(target_keypoints)
+                                all_angles.append(angles)
+                                target_detected_count += 1
+
+                                cv2.putText(
+                                    annotated_frame,
+                                    f"Target Mode: {target_mode}",
+                                    (30, frame_height - 40),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8,
+                                    (0, 255, 0),
+                                    2
+                                )
+                            except Exception:
+                                cv2.putText(
+                                    annotated_frame,
+                                    "Angle calculation failed",
+                                    (30, 40),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8,
+                                    (0, 255, 255),
+                                    2
+                                )
                     else:
                         cv2.putText(
                             annotated_frame,
-                            "No Person Keypoints",
+                            "No target keypoints detected",
                             (30, 40),
                             cv2.FONT_HERSHEY_SIMPLEX,
-                            1,
+                            0.8,
                             (0, 0, 255),
                             2
                         )
                 else:
                     cv2.putText(
                         annotated_frame,
-                        "No Pose Keypoints",
+                        "No pose detected",
                         (30, 40),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
+                        0.8,
                         (0, 0, 255),
                         2
                     )
-            else:
-                annotated_frame = frame
-                cv2.putText(
-                    annotated_frame,
-                    "No Pose Detected",
-                    (30, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 0, 255),
-                    2
-                )
 
-            frame_filename = f"pose_frame_{saved_count + 1}_{uuid.uuid4().hex[:6]}.jpg"
+            frame_filename = f"target_pose_frame_{processed_count + 1}_{uuid.uuid4().hex[:6]}.jpg"
             frame_path = output_dir / frame_filename
 
             cv2.imwrite(str(frame_path), annotated_frame)
             analyzed_frames.append(frame_path)
 
-            saved_count += 1
+            processed_count += 1
 
         frame_index += 1
 
@@ -242,8 +373,10 @@ def analyze_video_pose(video_path, output_dir, max_frames=6):
     if not all_angles:
         return {
             "success": False,
-            "error": "No usable human pose keypoints were detected in sampled frames.",
-            "analyzed_frames": analyzed_frames
+            "error": "No usable target player pose was detected.",
+            "analyzed_frames": analyzed_frames,
+            "processed_frames": processed_count,
+            "target_detected_frames": target_detected_count
         }
 
     average_angles = {}
@@ -262,5 +395,9 @@ def analyze_video_pose(video_path, output_dir, max_frames=6):
         "average_angles": average_angles,
         "movement_risk_score": movement_risk_score,
         "movement_risk_level": movement_risk_level,
-        "risk_flags": risk_flags
+        "risk_flags": risk_flags,
+        "processed_frames": processed_count,
+        "target_detected_frames": target_detected_count,
+        "analysis_fps": analysis_fps,
+        "target_mode": target_mode
     }

@@ -27,7 +27,7 @@ st.title("🎥 Video Biomechanics Analyzer")
 st.write(
     """
     Upload a sports movement video to extract video metadata, sample frames,
-    pose skeleton overlays, joint angles, and early movement-risk indicators.
+    target-player pose skeleton overlays, joint angles, and movement-risk indicators.
     """
 )
 
@@ -99,7 +99,7 @@ if uploaded_video is not None:
 
     st.markdown("---")
 
-    tab1, tab2 = st.tabs(["Frame Extraction", "Pose Skeleton Analysis"])
+    tab1, tab2 = st.tabs(["Frame Extraction", "Target Player Pose Analysis"])
 
     with tab1:
         st.markdown("### Extract Sample Frames")
@@ -127,20 +127,44 @@ if uploaded_video is not None:
                 st.error("No frames could be extracted from this video.")
 
     with tab2:
-        st.markdown("### Run Pose Skeleton Analysis")
+        st.markdown("### Analyze One Target Player")
 
         st.write(
             """
-            This uses MediaPipe Pose to detect body landmarks, draw skeleton overlays,
-            calculate joint angles, and flag risky movement patterns.
+            This module detects people in the video, selects one target player,
+            draws a skeleton only for that player, calculates joint angles,
+            and flags risky movement patterns.
             """
         )
 
-        if st.button("Analyze Pose Skeleton"):
+        target_mode = st.selectbox(
+            "Target Player Selection Mode",
+            ["Largest Player", "Center Player"]
+        )
+
+        analysis_fps = st.slider(
+            "Analysis FPS",
+            min_value=1,
+            max_value=10,
+            value=2,
+            help="Higher FPS analyzes more frames and gives smoother movement analysis, but it is slower."
+        )
+
+        max_analysis_seconds = st.slider(
+            "Max Analysis Duration",
+            min_value=3,
+            max_value=30,
+            value=10,
+            help="Limits how many seconds of the uploaded video will be analyzed."
+        )
+
+        if st.button("Analyze Target Player Pose"):
             pose_result = analyze_video_pose(
                 video_path=video_path,
                 output_dir=screenshot_output_dir,
-                max_frames=6
+                target_mode=target_mode,
+                analysis_fps=analysis_fps,
+                max_analysis_seconds=max_analysis_seconds
             )
 
             if not pose_result["success"]:
@@ -148,6 +172,7 @@ if uploaded_video is not None:
 
                 if "analyzed_frames" in pose_result:
                     st.markdown("### Frames Checked")
+
                     checked_cols = st.columns(3)
 
                     for index, frame_path in enumerate(pose_result["analyzed_frames"]):
@@ -157,8 +182,14 @@ if uploaded_video is not None:
                                 caption=f"Checked Frame {index + 1}",
                                 use_container_width=True
                             )
+
+                st.caption(
+                    f"Target detected in {pose_result.get('target_detected_frames', 0)} "
+                    f"out of {pose_result.get('processed_frames', 0)} processed frames"
+                )
+
             else:
-                st.success("Pose analysis completed successfully.")
+                st.success("Target player pose analysis completed successfully.")
 
                 metric_col1, metric_col2, metric_col3 = st.columns(3)
 
@@ -177,7 +208,14 @@ if uploaded_video is not None:
                 with metric_col3:
                     st.metric("Sport", sport)
 
-                st.markdown("### Skeleton Overlay Frames")
+                st.caption(f"Target Mode: {pose_result.get('target_mode', 'Not available')}")
+                st.caption(f"Analysis FPS: {pose_result.get('analysis_fps', 'Not available')}")
+                st.caption(
+                    f"Target detected in {pose_result.get('target_detected_frames', 0)} "
+                    f"out of {pose_result.get('processed_frames', 0)} processed frames"
+                )
+
+                st.markdown("### Target Player Skeleton Frames")
 
                 pose_cols = st.columns(3)
 
@@ -185,7 +223,7 @@ if uploaded_video is not None:
                     with pose_cols[index % 3]:
                         st.image(
                             str(frame_path),
-                            caption=f"Pose Frame {index + 1}",
+                            caption=f"Target Pose Frame {index + 1}",
                             use_container_width=True
                         )
 
