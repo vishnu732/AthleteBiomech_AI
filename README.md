@@ -221,35 +221,35 @@ streamlit run app/main.py
 
 ### Phase 2 — ML-Based Risk Prediction
 
-- [ ] Generate synthetic athlete workload dataset
-- [ ] Train Random Forest / XGBoost model
-- [ ] Save model as `.pkl`
-- [ ] Connect ML model to dashboard
-- [ ] Compare rule-based score vs ML score
+- [x] Generate synthetic athlete workload dataset
+- [x] Train Random Forest / XGBoost model
+- [x] Save model as `.pkl`
+- [x] Connect ML model to dashboard
+- [x] Compare rule-based score vs ML score
 
 ### Phase 3 — Video-Based Biomechanics
 
-- [ ] Add video upload
-- [ ] Extract frames using OpenCV
-- [ ] Add pose estimation using MediaPipe
-- [ ] Track body keypoints
-- [ ] Calculate joint angles
-- [ ] Detect risky movement patterns
+- [x] Add video upload
+- [x] Extract frames using OpenCV
+- [x] Add pose estimation using MediaPipe
+- [x] Track body keypoints
+- [x] Calculate joint angles
+- [x] Detect risky movement patterns
 
 ### Phase 4 — Coach Report Generator
 
-- [ ] Generate injury risk report
-- [ ] Add screenshots from video
-- [ ] Add body-load summary
-- [ ] Add correction recommendations
-- [ ] Export report as PDF
+- [x] Generate injury risk report
+- [x] Add screenshots from video
+- [x] Add body-load summary
+- [x] Add correction recommendations
+- [x] Export report as PDF
 
 ### Phase 5 — Deployment
 
-- [ ] Dockerize the app
-- [ ] Deploy on AWS EC2
-- [ ] Store uploaded videos in AWS S3
-- [ ] Add production-ready README screenshots
+- [x] Dockerize the app
+- [x] Deploy on AWS EC2
+- [x] Store uploaded videos in AWS S3
+- [x] Add production-ready README screenshots
 
 ---
 
@@ -289,3 +289,59 @@ Completed:
 Next planned module:
 
 **ML-based injury risk prediction using synthetic athlete workload data.**
+
+## Demo Screenshots
+
+### 1. Home Dashboard
+
+The home dashboard introduces AthleteBiomech AI as a sports injury-risk analysis platform. It provides a clean overview of the system modules, supported sports, and the recommended analysis flow.
+
+![Home Dashboard](assets/screenshots/home1.png)
+
+![Home Dashboard](assets/screenshots/home2.png)
+
+---
+
+### 2. Workload Injury Risk Predictor
+
+The workload risk module estimates an athlete’s injury risk using training frequency, match load, rest days, training intensity, age, sport type, and previous injury history. It combines rule-based logic with a trained machine learning model to generate a risk score, risk level, and sport-specific risk factors.
+
+![Workload Injury Risk Predictor](assets/screenshots/workload-risk1.png)
+
+![Workload Injury Risk Predictor](assets/screenshots/workload-risk2.png)
+
+---
+
+### 3. Video Biomechanics Analyzer
+
+The video analysis module allows users to upload a sports movement video and analyze target-player biomechanics. It extracts frames, detects athlete posture, calculates joint-angle patterns, and identifies risky movement mechanics that may increase injury risk.
+
+![Video Biomechanics Analyzer](assets/screenshots/video-analyzer1.png)
+
+![Video Biomechanics Analyzer](assets/screenshots/video-analyzer2.png)
+
+![Video Biomechanics Analyzer](assets/screenshots/video-analyzer3.png)
+
+![Video Biomechanics Analyzer](assets/screenshots/video-analyzer4.png)
+
+![Video Biomechanics Analyzer](assets/screenshots/video-analyzer5.png)
+
+---
+
+### 4. Coach Injury Risk Report
+
+The coach report generator combines workload-based risk and video-based movement risk into one final injury prevention report. It summarizes the athlete’s risk score, risky body areas, workload reasons, movement flags, joint angles, and practical coach recommendations.
+
+![Coach Injury Risk Report](assets/screenshots/report1.png)
+
+![Coach Injury Risk Report](assets/screenshots/report2.png)
+
+---
+
+### 5. PDF Report Export
+
+The platform supports downloadable PDF reports so coaches, trainers, or analysts can save and share athlete injury-risk insights in a professional report format.
+
+![PDF Report Export](assets/screenshots/pdf-report.pdf)
+
+
