@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT_DIR))
 
+from src.ui_styles import apply_global_styles, render_hero, render_risk_badge
 from src.video_processor import (
     save_uploaded_video,
     get_video_metadata,
@@ -21,8 +22,13 @@ st.set_page_config(
     page_icon="🎥",
     layout="wide"
 )
+apply_global_styles()
 
-st.title("🎥 Video Biomechanics Analyzer")
+render_hero(
+    title="Video Biomechanics Analyzer",
+    subtitle="Upload a sports movement video and analyze target-player posture, joint angles, and risky mechanics.",
+    pills=["YOLO Pose", "Target Player", "Joint Angles", "Movement Risk"]
+)
 
 st.write(
     """

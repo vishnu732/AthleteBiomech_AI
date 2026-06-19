@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT_DIR))
 
+from src.ui_styles import apply_global_styles, render_hero, render_risk_badge
 from src.risk_engine import calculate_workload_risk
 
 st.set_page_config(
@@ -14,8 +15,13 @@ st.set_page_config(
     page_icon="⚠️",
     layout="wide"
 )
+apply_global_styles()
 
-st.title("⚠️ Workload Injury Risk Predictor")
+render_hero(
+    title="Workload Injury Risk Predictor",
+    subtitle="Estimate injury risk using athlete workload, match frequency, rest days, training intensity, and previous injury history.",
+    pills=["ML Risk Model", "Sport-Specific Load", "Recovery Analysis"]
+)
 
 st.write(
     """

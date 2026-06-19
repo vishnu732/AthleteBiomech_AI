@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT_DIR))
 
+from src.ui_styles import apply_global_styles, render_hero, render_risk_badge
 from src.report_generator import create_coach_pdf_report
 
 
@@ -15,9 +16,13 @@ st.set_page_config(
     page_icon="📄",
     layout="wide"
 )
+apply_global_styles()
 
-st.title("📄 Coach Report Generator")
-
+render_hero(
+    title="Coach Report Generator",
+    subtitle="Combine workload risk and movement risk into a professional coach-style injury prevention report.",
+    pills=["Combined Risk", "Recommendations", "PDF Export"]
+)
 st.write(
     """
     This page combines workload-based injury risk and video-based movement risk
