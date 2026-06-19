@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT_DIR))
+
+from src.report_generator import create_coach_pdf_report
 
 
 st.set_page_config(
@@ -274,14 +281,34 @@ if workload_result is not None and pose_result is not None:
         combined_level=combined_level
     )
 
+    pdf_bytes = create_coach_pdf_report(
+        athlete_name=athlete_name,
+        sport=sport,
+        workload_result=workload_result,
+        pose_result=pose_result,
+        combined_score=combined_score,
+        combined_level=combined_level
+    )
+
     st.markdown("### Download Coach Report")
 
-    st.download_button(
-        label="Download Report as TXT",
-        data=report_text,
-        file_name=f"{athlete_name}_injury_risk_report.txt",
-        mime="text/plain"
-    )
+    download_col1, download_col2 = st.columns(2)
+
+    with download_col1:
+        st.download_button(
+            label="Download Report as TXT",
+            data=report_text,
+            file_name=f"{athlete_name}_injury_risk_report.txt",
+            mime="text/plain"
+        )
+
+    with download_col2:
+        st.download_button(
+            label="Download Report as PDF",
+            data=pdf_bytes,
+            file_name=f"{athlete_name}_injury_risk_report.pdf",
+            mime="application/pdf"
+        )
 
 else:
     st.markdown("---")
